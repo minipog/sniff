@@ -87,9 +87,6 @@ exports.NetworkMod = function (mod) {
             packetParsing = !packetParsing;
             mod.command.message(`PARSING: ${packetParsing ? 'ON' : 'OFF'}`);
         },
-        reload() {
-            mod.command.exec('proxy reload sniff-master');
-        },
     });
 
     this.destructor = () => endPacketLogging();
