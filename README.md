@@ -1,2 +1,3 @@
 # sniff
-A TERA Online packet logger
+
+A TERA Online packet logger for TTB
