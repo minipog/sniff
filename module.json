@@ -1,0 +1,9 @@
+{
+    "disableAutoUpdate": true,
+    "name": "sniff-master",
+    "author": "Mathi, minipog",
+    "servers": [],
+    "options": {
+        "cliName": "sniff"
+    }
+}
