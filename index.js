@@ -35,7 +35,7 @@ exports.NetworkMod = function (mod) {
     const getPacketName = (code) => mod.dispatch.protocolMap.code.get(code) || `UNMAPPED CODE ${code}`;
 
     const parsePacketData = (code, data) => {
-        if (!packetParsing) return;
+        if (!packetParsing) return null;
 
         try {
             return inspect(mod.dispatch.fromRaw(code, '*', data), LOG.INSPECT_OPTS);
@@ -44,15 +44,15 @@ exports.NetworkMod = function (mod) {
 
             if (!errString.includes('no definition found for message')) {
                 mod.warn({ parseError: err.message });
-                return false;
+                return null;
             }
         }
     };
 
     const getPacketData = (code, data) => ({
         name: getPacketName(code),
-        hexString: data.toString('hex'),
-        fromRaw: parsePacketData(code, data),
+        hex: data.toString('hex'),
+        data: parsePacketData(code, data),
     });
 
     const startPacketLogging = () => {
@@ -64,14 +64,8 @@ exports.NetworkMod = function (mod) {
 
             if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
 
-            logStream.write(
-                '\n\n' +
-                    [
-                        `[${Date.now()}, ${filter}: ${packetData.name}]`,
-                        packetData.hexString,
-                        packetData.fromRaw || '',
-                    ].join('\n')
-            );
+            const logData = JSON.stringify({ ...packetData, filter, time: Date.now() }, null, 4);
+            logStream.write(`\n\n${logData.replace(/"/g, '')}`);
         });
     };
 
@@ -92,6 +86,9 @@ exports.NetworkMod = function (mod) {
         parse() {
             packetParsing = !packetParsing;
             mod.command.message(`PARSING: ${packetParsing ? 'ON' : 'OFF'}`);
+        },
+        reload() {
+            mod.command.exec('proxy reload sniff-master');
         },
     });
 
