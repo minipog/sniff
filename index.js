@@ -49,18 +49,18 @@ exports.NetworkMod = function (mod) {
         }
     };
 
-    const getPacketData = (code, data, fromServer) => ({
+    const getPacketData = (code, data) => ({
         name: getPacketName(code),
         hex: data.toString('hex'),
         data: parsePacketData(code, data),
-        filter: boolsToNumbers(data.$fake, data.$silenced, data.$modified, fromServer),
+        filter: boolsToNumbers(data.$fake, data.$silenced, data.$modified, data.$real),
     });
 
     const startPacketLogging = () => {
         logStream = makeNewStream();
 
-        hook = mod.hook('*', 'raw', LOG.HOOK_OPTS, (code, data, fromServer) => {
-            const packetData = getPacketData(code, data, fromServer);
+        hook = mod.hook('*', 'raw', LOG.HOOK_OPTS, (code, data) => {
+            const packetData = getPacketData(code, data);
             if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
 
             const logData = JSON.stringify({ ...packetData, time: Date.now() }, null, 4);
