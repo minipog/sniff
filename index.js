@@ -53,7 +53,7 @@ exports.NetworkMod = function (mod) {
         name: getPacketName(code),
         hex: data.toString('hex'),
         data: parsePacketData(code, data),
-        filter: boolsToNumbers(data.$fake, data.$silenced, data.$modified, data.$real),
+        filter: boolsToNumbers(data.$fake, data.$silenced, data.$modified, !data.$fake),
     });
 
     const startPacketLogging = () => {
