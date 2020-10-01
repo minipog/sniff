@@ -4,7 +4,7 @@ const { existsSync, mkdirSync, createWriteStream } = require('fs');
 
 const LOG = Object.freeze({
     DIR: join(__dirname, 'logs'),
-    IGNORED_PACKETS: new Set(require('./ignored')),
+    IGNORED_PACKETS: new Set(require('./ignoredPackets')),
     INSPECT_OPTS: { depth: null, breakLength: Infinity, compact: true },
     HOOK_OPTS: { order: Infinity, filter: { fake: null, silenced: null, modified: null } },
 });
