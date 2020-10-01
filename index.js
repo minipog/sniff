@@ -40,12 +40,7 @@ exports.NetworkMod = function (mod) {
         try {
             return inspect(mod.dispatch.fromRaw(code, '*', data), LOG.INSPECT_OPTS);
         } catch (err) {
-            const errString = err.toString();
-
-            if (!errString.includes('no definition found for message')) {
-                mod.warn({ parseError: err.message });
-                return null;
-            }
+            return { parseError: err.message };
         }
     };
 
@@ -54,6 +49,7 @@ exports.NetworkMod = function (mod) {
         hex: data.toString('hex'),
         data: parsePacketData(code, data),
         filter: boolsToNumbers(data.$fake, data.$silenced, data.$modified, !data.$fake),
+        time: Date.now(),
     });
 
     const startPacketLogging = () => {
@@ -63,8 +59,8 @@ exports.NetworkMod = function (mod) {
             const packetData = getPacketData(code, data);
             if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
 
-            const logData = JSON.stringify({ ...packetData, time: Date.now() }, null, 4);
-            logStream.write('\n\n' + logData.replace(/"/g, ''));
+            const format = JSON.stringify(packetData, null, 4);
+            logStream.write('\n\n' + format.replace(/"/g, ''));
         });
     };
 
