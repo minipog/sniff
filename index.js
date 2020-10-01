@@ -12,30 +12,23 @@ const LOG = Object.freeze({
 if (!existsSync(LOG.DIR)) mkdirSync(LOG.DIR);
 
 exports.NetworkMod = function (mod) {
+    const {
+        majorPatchVersion,
+        minorPatchVersion,
+        dispatch: { protocolVersion },
+    } = mod;
+
     let hook = null;
     let enabled = false;
-    let packetParsing = true;
     let logStream = null;
-
-    const makeNewStream = () => {
-        const {
-            majorPatchVersion,
-            minorPatchVersion,
-            dispatch: { protocolVersion },
-        } = mod;
-
-        const newStream = createWriteStream(join(LOG.DIR, `ttb-${Date.now()}.log`), { highWaterMark: 1024 * 1024 });
-        newStream.write(`# PATCH ${majorPatchVersion}.${minorPatchVersion} PROTOCOL ${protocolVersion}`);
-
-        return newStream;
-    };
+    let packetParsing = true;
 
     const boolsToNumbers = (...bools) => bools.map(Number).join('');
 
     const getPacketName = (code) => mod.dispatch.protocolMap.code.get(code) || `UNMAPPED CODE ${code}`;
 
     const parsePacketData = (code, data) => {
-        if (!packetParsing) return null;
+        if (!packetParsing) return;
 
         try {
             return inspect(mod.dispatch.fromRaw(code, '*', data), LOG.INSPECT_OPTS);
@@ -52,16 +45,18 @@ exports.NetworkMod = function (mod) {
         time: Date.now(),
     });
 
+    const logPacketData = (code, data) => {
+        const packetData = getPacketData(code, data);
+        if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
+
+        const format = JSON.stringify(packetData, null, 4);
+        logStream.write('\n\n' + format.replace(/"/g, ''));
+    };
+
     const startPacketLogging = () => {
-        logStream = makeNewStream();
-
-        hook = mod.hook('*', 'raw', LOG.HOOK_OPTS, (code, data) => {
-            const packetData = getPacketData(code, data);
-            if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
-
-            const format = JSON.stringify(packetData, null, 4);
-            logStream.write('\n\n' + format.replace(/"/g, ''));
-        });
+        logStream = createWriteStream(join(LOG.DIR, `ttb-${Date.now()}.log`), { highWaterMark: 1024 * 1024 });
+        logStream.write(`# PATCH ${majorPatchVersion}.${minorPatchVersion} PROTOCOL ${protocolVersion}`);
+        return mod.hook('*', 'raw', LOG.HOOK_OPTS, logPacketData);
     };
 
     const endPacketLogging = () => {
@@ -74,7 +69,7 @@ exports.NetworkMod = function (mod) {
     mod.command.add('log', {
         $default() {
             enabled = !enabled;
-            if (enabled) startPacketLogging();
+            if (enabled) hook = startPacketLogging();
             else endPacketLogging();
             mod.command.message(`LOGGING: ${enabled ? 'ON' : 'OFF'} | PARSING: ${packetParsing ? 'ON' : 'OFF'}`);
         },
