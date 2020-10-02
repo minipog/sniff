@@ -13,6 +13,7 @@ if (!existsSync(LOG.DIR)) mkdirSync(LOG.DIR);
 
 exports.NetworkMod = function (mod) {
     const {
+        publisher,
         majorPatchVersion,
         minorPatchVersion,
         dispatch: { protocolVersion },
@@ -55,7 +56,7 @@ exports.NetworkMod = function (mod) {
 
     const startPacketLogging = () => {
         logStream = createWriteStream(join(LOG.DIR, `ttb-${Date.now()}.log`), { highWaterMark: 1024 * 1024 });
-        logStream.write(`# PATCH ${majorPatchVersion}.${minorPatchVersion} PROTOCOL ${protocolVersion}`);
+        logStream.write(`# ${publisher}-${majorPatchVersion}.${minorPatchVersion} PROTOCOL ${protocolVersion}`);
         return mod.hook('*', 'raw', LOG.HOOK_OPTS, logPacketData);
     };
 
