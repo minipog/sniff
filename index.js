@@ -5,6 +5,7 @@ const { existsSync, mkdirSync, createWriteStream } = require('fs');
 const LOG = Object.freeze({
     DIR: join(__dirname, 'logs'),
     IGNORED_PACKETS: new Set(require('./ignoredPackets')),
+    STREAM_OPTS: { highWaterMark: 1024 * 1024 },
     INSPECT_OPTS: { depth: null, breakLength: Infinity, compact: true },
     HOOK_OPTS: { order: Infinity, filter: { fake: null, silenced: null, modified: null } },
 });
@@ -12,13 +13,6 @@ const LOG = Object.freeze({
 if (!existsSync(LOG.DIR)) mkdirSync(LOG.DIR);
 
 exports.NetworkMod = function (mod) {
-    const {
-        publisher,
-        majorPatchVersion,
-        minorPatchVersion,
-        dispatch: { protocolVersion },
-    } = mod;
-
     let hook = null;
     let enabled = false;
     let logStream = null;
@@ -27,6 +21,8 @@ exports.NetworkMod = function (mod) {
     const boolsToNumbers = (...bools) => bools.map(Number).join('');
 
     const getPacketName = (code) => mod.dispatch.protocolMap.code.get(code) || `UNMAPPED CODE ${code}`;
+
+    const formatPacketData = (packetData) => JSON.stringify(packetData, null, 4).replace(/"/g, '');
 
     const parsePacketData = (code, data) => {
         if (!packetParsing) return;
@@ -50,13 +46,20 @@ exports.NetworkMod = function (mod) {
         const packetData = getPacketData(code, data);
         if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
 
-        const format = JSON.stringify(packetData, null, 4);
-        logStream.write('\n\n' + format.replace(/"/g, ''));
+        logStream.write(`\n\n${formatPacketData(packetData)}`);
     };
 
     const startPacketLogging = () => {
-        logStream = createWriteStream(join(LOG.DIR, `ttb-${Date.now()}.log`), { highWaterMark: 1024 * 1024 });
+        const {
+            publisher,
+            majorPatchVersion,
+            minorPatchVersion,
+            dispatch: { protocolVersion },
+        } = mod;
+
+        logStream = createWriteStream(join(LOG.DIR, `ttb-${Date.now()}.log`), LOG.STREAM_OPTS);
         logStream.write(`# ${publisher}-${majorPatchVersion}.${minorPatchVersion} PROTOCOL ${protocolVersion}`);
+
         return mod.hook('*', 'raw', LOG.HOOK_OPTS, logPacketData);
     };
 
