@@ -13,8 +13,6 @@ const LOG = Object.freeze({
 if (!existsSync(LOG.DIR)) mkdirSync(LOG.DIR);
 
 exports.NetworkMod = function (mod) {
-    let hook, toggle, stream;
-
     const boolsToNumbers = (...bools) => bools.map(Number).join('');
 
     const getPacketName = (code) => mod.dispatch.protocolMap.code.get(code) || `UNMAPPED CODE ${code}`;
@@ -37,12 +35,7 @@ exports.NetworkMod = function (mod) {
         time: Date.now(),
     });
 
-    const logPacketData = (code, data) => {
-        const packetData = getPacketData(code, data);
-        if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
-
-        stream.write(`\n\n${formatPacketData(packetData)}`);
-    };
+    let stream, hook, toggle;
 
     const startPacketLogging = () => {
         const {
@@ -56,6 +49,13 @@ exports.NetworkMod = function (mod) {
         stream.write(`# ${publisher} ${majorPatchVersion}.${minorPatchVersion} (${protocolVersion})`);
 
         return mod.hook('*', 'raw', LOG.HOOK_OPTS, logPacketData);
+    };
+
+    const logPacketData = (code, data) => {
+        const packetData = getPacketData(code, data);
+        if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
+
+        stream.write(`\n\n${formatPacketData(packetData)}`);
     };
 
     const endPacketLogging = () => {
