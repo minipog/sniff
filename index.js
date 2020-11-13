@@ -13,10 +13,7 @@ const LOG = Object.freeze({
 if (!existsSync(LOG.DIR)) mkdirSync(LOG.DIR);
 
 exports.NetworkMod = function (mod) {
-    let hook = null;
-    let enabled = false;
-    let logStream = null;
-    let packetParsing = true;
+    let hook, toggle, stream;
 
     const boolsToNumbers = (...bools) => bools.map(Number).join('');
 
@@ -25,8 +22,6 @@ exports.NetworkMod = function (mod) {
     const formatPacketData = (packetData) => JSON.stringify(packetData, null, 4).replace(/"/g, '');
 
     const parsePacketData = (code, data) => {
-        if (!packetParsing) return;
-
         try {
             return inspect(mod.dispatch.fromRaw(code, '*', data), LOG.INSPECT_OPTS);
         } catch (err) {
@@ -46,7 +41,7 @@ exports.NetworkMod = function (mod) {
         const packetData = getPacketData(code, data);
         if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
 
-        logStream.write(`\n\n${formatPacketData(packetData)}`);
+        stream.write(`\n\n${formatPacketData(packetData)}`);
     };
 
     const startPacketLogging = () => {
@@ -57,8 +52,8 @@ exports.NetworkMod = function (mod) {
             dispatch: { protocolVersion },
         } = mod;
 
-        logStream = createWriteStream(join(LOG.DIR, `ttb-${Date.now()}.log`), LOG.STREAM_OPTS);
-        logStream.write(`# ${publisher}-${majorPatchVersion}.${minorPatchVersion} PROTOCOL ${protocolVersion}`);
+        stream = createWriteStream(join(LOG.DIR, `ttb-${Date.now()}.log`), LOG.STREAM_OPTS);
+        stream.write(`# ${publisher} ${majorPatchVersion}.${minorPatchVersion} (${protocolVersion})`);
 
         return mod.hook('*', 'raw', LOG.HOOK_OPTS, logPacketData);
     };
@@ -66,20 +61,17 @@ exports.NetworkMod = function (mod) {
     const endPacketLogging = () => {
         try {
             mod.unhook(hook);
-            logStream.end();
+            stream.end();
         } catch (_) {}
     };
 
     mod.command.add('log', {
         $default() {
-            enabled = !enabled;
-            if (enabled) hook = startPacketLogging();
+            toggle = !toggle;
+            if (toggle) hook = startPacketLogging();
             else endPacketLogging();
-            mod.command.message(`LOGGING: ${enabled ? 'ON' : 'OFF'} | PARSING: ${packetParsing ? 'ON' : 'OFF'}`);
-        },
-        parse() {
-            packetParsing = !packetParsing;
-            mod.command.message(`PARSING: ${packetParsing ? 'ON' : 'OFF'}`);
+
+            mod.command.message(`LOGGING: ${toggle ? 'ON' : 'OFF'}`);
         },
     });
 
