@@ -1,16 +1,10 @@
 const { join } = require('path');
 const { inspect } = require('util');
 const { existsSync, mkdirSync, createWriteStream } = require('fs');
+const IGNORED_PACKETS = require('./ignoredPackets.json');
+const LOG_DIRECTORY = join(__dirname, 'logs');
 
-const LOG = Object.freeze({
-    DIR: join(__dirname, 'logs'),
-    IGNORED_PACKETS: new Set(require('./ignoredPackets')),
-    STREAM_OPTS: { highWaterMark: 1024 * 1024 },
-    INSPECT_OPTS: { depth: null, breakLength: Infinity, compact: true },
-    HOOK_OPTS: { order: Infinity, filter: { fake: null, silenced: null, modified: null } },
-});
-
-if (!existsSync(LOG.DIR)) mkdirSync(LOG.DIR);
+if (!existsSync(LOG_DIRECTORY)) mkdirSync(LOG_DIRECTORY);
 
 exports.NetworkMod = function (mod) {
     const boolsToNumbers = (...bools) => bools.map(Number).join('');
@@ -21,7 +15,11 @@ exports.NetworkMod = function (mod) {
 
     const parsePacketData = (code, data) => {
         try {
-            return inspect(mod.dispatch.fromRaw(code, '*', data), LOG.INSPECT_OPTS);
+            return inspect(mod.dispatch.fromRaw(code, '*', data), {
+                depth: null,
+                breakLength: Infinity,
+                compact: true,
+            });
         } catch (err) {
             return { parseError: err.message };
         }
@@ -35,27 +33,23 @@ exports.NetworkMod = function (mod) {
         time: Date.now(),
     });
 
-    let stream, hook, toggle;
+    let stream, hook;
 
     const startPacketLogging = () => {
-        const {
-            publisher,
-            majorPatchVersion,
-            minorPatchVersion,
-            dispatch: { protocolVersion },
-        } = mod;
+        stream = createWriteStream(join(LOG_DIRECTORY, `ttb-${Date.now()}.log`), { highWaterMark: 1024 * 1024 });
+        stream.write(`# ${mod.majorPatchVersion}.${mod.minorPatchVersion} (${mod.dispatch.protocolVersion})`);
 
-        stream = createWriteStream(join(LOG.DIR, `ttb-${Date.now()}.log`), LOG.STREAM_OPTS);
-        stream.write(`# ${publisher} ${majorPatchVersion}.${minorPatchVersion} (${protocolVersion})`);
+        hook = mod.hook(
+            '*',
+            'raw',
+            { order: Infinity, filter: { fake: null, silenced: null, modified: null } },
+            (code, data) => {
+                const packetData = getPacketData(code, data);
+                if (IGNORED_PACKETS.includes(packetData.name)) return;
 
-        return mod.hook('*', 'raw', LOG.HOOK_OPTS, logPacketData);
-    };
-
-    const logPacketData = (code, data) => {
-        const packetData = getPacketData(code, data);
-        if (LOG.IGNORED_PACKETS.has(packetData.name)) return;
-
-        stream.write(`\n\n${formatPacketData(packetData)}`);
+                stream.write(`\n\n${formatPacketData(packetData)}`);
+            }
+        );
     };
 
     const endPacketLogging = () => {
@@ -65,14 +59,14 @@ exports.NetworkMod = function (mod) {
         } catch (_) {}
     };
 
-    mod.command.add('log', {
-        $default() {
-            toggle = !toggle;
-            if (toggle) hook = startPacketLogging();
-            else endPacketLogging();
+    let toggle;
 
-            mod.command.message(`LOGGING: ${toggle ? 'ON' : 'OFF'}`);
-        },
+    mod.command.add('log', () => {
+        toggle = !toggle;
+        if (toggle) startPacketLogging();
+        else endPacketLogging();
+
+        mod.command.message(`LOGGING: ${toggle ? 'ON' : 'OFF'}`);
     });
 
     this.destructor = () => endPacketLogging();
