@@ -59,7 +59,7 @@ exports.NetworkMod = function (mod) {
         } catch (_) {}
     };
 
-    let toggle;
+    let toggle = false;
 
     mod.command.add('log', () => {
         toggle = !toggle;
