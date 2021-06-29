@@ -29,7 +29,7 @@ exports.NetworkMod = function (mod) {
         name: getPacketName(code),
         hex: data.toString('hex'),
         data: parsePacketData(code, data),
-        filter: boolsToNumbers(data.$fake, data.$silenced, data.$modified, !data.$fake),
+        filter: boolsToNumbers(data.$fake, data.$silenced, data.$modified),
         time: Date.now(),
     });
 
@@ -59,14 +59,14 @@ exports.NetworkMod = function (mod) {
         } catch (_) {}
     };
 
-    let toggle = false;
+    let isEnabled = false;
 
     mod.command.add('log', () => {
-        toggle = !toggle;
-        if (toggle) startPacketLogging();
+        isEnabled = !isEnabled;
+        if (isEnabled) startPacketLogging();
         else endPacketLogging();
 
-        mod.command.message(`LOGGING: ${toggle ? 'ON' : 'OFF'}`);
+        mod.command.message(`LOGGING: ${isEnabled ? 'ON' : 'OFF'}`);
     });
 
     this.destructor = () => endPacketLogging();
